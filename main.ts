@@ -1,42 +1,39 @@
-// ai-excited-01 entrypoint (Node 22, standard library only).
+// Dragon Gate — ai-excited-01 entrypoint.
 //
-// The entry is a single image, entry.png, sitting beside this file. This
-// program places an exact copy of it at <output>/entry.png, where the
-// output directory comes from MAKEFUN_OUTPUT_DIR (or /output by default).
-// It uses no network and writes the same bytes on every run.
+// The entry is a single image, entry.png, stored next to this file. This
+// program places an exact copy of it at <output>/entry.png. The output
+// directory is MAKEFUN_OUTPUT_DIR when set, otherwise /output. It needs no
+// network, and every run writes the same bytes.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
-const SOURCE = join(dirname(fileURLToPath(import.meta.url)), 'entry.png');
+const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+const here = dirname(fileURLToPath(import.meta.url));
+const sourcePath = join(here, "entry.png");
 
-// The file must be a whole PNG or a whole JPEG: read its kind off the
-// first bytes. Anything else is not an image the gate accepts.
-function imageKind(bytes: Buffer): 'png' | 'jpeg' | null {
-  if (
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47
-  ) {
-    return 'png';
-  }
+// A whole PNG starts with its 8-byte signature; a whole JPEG starts with
+// the SOI marker FF D8 FF. Anything else is not an image the gate accepts.
+function kindOf(bytes: Buffer): "png" | "jpeg" | null {
+  const pngSig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (pngSig.every((b, i) => bytes[i] === b)) return "png";
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return 'jpeg';
+    return "jpeg";
   }
   return null;
 }
 
-const image = readFileSync(SOURCE);
-const kind = imageKind(image);
+const image = readFileSync(sourcePath);
+if (image.length === 0) {
+  throw new Error("entry.png is empty");
+}
+const kind = kindOf(image);
 if (kind === null) {
-  throw new Error('entry.png is neither a PNG nor a JPEG');
+  throw new Error("entry.png is neither a whole PNG nor a whole JPEG");
 }
 
-mkdirSync(OUTPUT_DIR, { recursive: true });
-writeFileSync(join(OUTPUT_DIR, 'entry.png'), image);
-console.log(
-  `wrote ${image.length} bytes (${kind}) to ${join(OUTPUT_DIR, 'entry.png')}`,
-);
+const target = join(outDir, "entry.png");
+mkdirSync(outDir, { recursive: true });
+writeFileSync(target, image);
+console.log(`wrote ${image.length} bytes (${kind}) to ${target}`);
